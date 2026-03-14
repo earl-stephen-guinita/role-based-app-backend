@@ -52,7 +52,7 @@ app.post('/api/login', async (req, res) => {
 
     const user = users.find(u => u.username === username);
     if (!user || !await bcrypt.compare(password, user.password)) {
-        return res.status(401).json({ error: 'Invalud credentials' });
+        return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = jwt.sign(
@@ -63,3 +63,4 @@ app.post('/api/login', async (req, res) => {
 
     res.json({ token, user: { username: user.username, role: user.role } });
 });
+
