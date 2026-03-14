@@ -64,3 +64,15 @@ app.post('/api/login', async (req, res) => {
     res.json({ token, user: { username: user.username, role: user.role } });
 });
 
+app.get('/api/profile', authenticateToken, (req, res) => {
+    res.json({ user: req.user });
+});
+    
+app.get('/api/admin/dashboard', authenticateToken, authorizeRole('admin'), (req, res) => {
+    res.json({ message: 'Welcome to admin dashboard!', data: 'Secret admin info' });
+});
+
+app.get('/api/content/guest', (req, res) => {
+    res.json({ message: 'Public content for all visitors' });
+});
+
