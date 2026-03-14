@@ -17,3 +17,8 @@ let users = [
     { id: 1, username: 'admin', password: '$2a$10$...', role: 'admin'},
     { id: 2, username: 'alice', password: '$2a$10$...', role: 'user'}
 ];
+
+if (!users[0].password.includes('$2a$')) {
+    users[0].password = bcrypt.hashSync('admin123', 10);
+    users[1].password = bcrypt.hashSync('user123', 10);
+}
