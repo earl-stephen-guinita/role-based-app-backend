@@ -22,3 +22,28 @@ if (!users[0].password.includes('$2a$')) {
     users[0].password = bcrypt.hashSync('admin123', 10);
     users[1].password = bcrypt.hashSync('user123', 10);
 }
+
+app.post('/api/register', async (req, res) => {
+   const {username, password, role = 'user'} = req.body;
+   
+   if (!username || !password) {
+    return res.status(400).json({error: 'Username and password required'});
+   }
+
+   const existing = users.find(u => u.username === username);
+   if (existing) {
+    return res.status(409).json({ error: 'User already exists'});
+   }
+
+   const hashedPassword = await bcrypt.hash(password, 10);
+   const newUser = {
+    id: users.length + 1,
+    username,
+    password: hashedPassword,
+    role
+   };
+
+   users.push(newUser);
+   res.status(201).json ({ message: 'User registered', username, role});
+});
+
