@@ -14,8 +14,8 @@ app.use(cors({
 app.use(express.json());
 
 let users = [
-    { id: 1, firstName: 'Admin', lastName: 'User', email: 'admin@example.com', password: '$2a$10$...', role: 'admin'},
-    { id: 2, firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', password: '$2a$10$...', role: 'user'}
+    { id: 1, firstName: 'Admin', lastName: 'User', email: 'admin@example.com', password: 'UNHASHED', role: 'admin'},
+    { id: 2, firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', password: 'UNHASHED', role: 'user'}
 ];
 
 if (!users[0].password.includes('$2a$')) {
@@ -25,10 +25,10 @@ if (!users[0].password.includes('$2a$')) {
 
 // POST Register Route
 app.post('/api/register', async (req, res) => {
-   const {email, password, role = 'user'} = req.body;
+   const {firstName, lastName, email, password, role = 'user'} = req.body;
    
-   if (!email|| !password) {
-    return res.status(400).json({error: 'Email and password required'});
+   if (!firstName || !lastName || !email|| !password) {
+    return res.status(400).json({error: 'All fields are required'});
    }
 
    const existing = users.find(u => u.email === email);
@@ -39,13 +39,15 @@ app.post('/api/register', async (req, res) => {
    const hashedPassword = await bcrypt.hash(password, 10);
    const newUser = {
     id: users.length + 1,
+    firstName,
+    lastName,
     email,
     password: hashedPassword,
     role
    };
 
    users.push(newUser);
-   res.status(201).json ({ message: 'User registered', email, role});
+   res.status(201).json ({ message: 'User registered', firstName, lastName, email, role});
 });
 
 // POST Login Route

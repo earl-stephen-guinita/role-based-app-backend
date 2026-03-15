@@ -175,7 +175,7 @@ function setAuthState(isAuth, user = null) {
 
 // ── Logout ─────────────────────────────────────────────────
 logoutBtn.addEventListener("click", function () {
-    localStorage.removeItem("auth_token");
+    sessionStorage.removeItem('authToken');
     setAuthState(false);
     navigateTo('#/');
 });
@@ -187,7 +187,7 @@ function getAuthHeader() {
 }
 
 // ── Register Form ──────────────────────────────────────────
-document.getElementById("registerForm").addEventListener("submit", function (e) {
+document.getElementById("registerForm").addEventListener("submit", async function (e) {
     e.preventDefault();
 
     const form = this;
@@ -201,22 +201,26 @@ document.getElementById("registerForm").addEventListener("submit", function (e) 
         return;
     }
 
-    // Check duplicate first
-    const exists = window.db.accounts.find(a => a.email === email);
-    if (exists) {
-        alert("Email already registered.");
-        return;
-    }
-    // Save to accounts array
-    window.db.accounts.push({ firstName, lastName, email, password, role: "admin", verified: false });
-    saveToStorage();
-    // Store just the email for verification step
-    localStorage.setItem("unverified_email", email);
+    try {
+        const response = await fetch('http://localhost:3000/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ firstName, lastName, email, password })
+        });
 
-    form.classList.remove("was-validated");
-    form.reset();
-    document.getElementById("verifyEmailDisplay").textContent = email;
-    navigateTo('#/verify');
+        const data = await response.json();
+
+        if (response.ok) {
+            form.classList.remove("was-validated");
+            form.reset();
+            document.getElementById("verifyEmailDisplay").textContent = email;
+            navigateTo('#/verify');
+        } else {
+            alert(data.error || 'Registration failed.');
+        }
+    } catch (err) {
+        alert('Network error.');
+    }
 });
 
 // ── Simulate Email Verification ────────────────────────────
