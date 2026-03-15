@@ -14,8 +14,8 @@ app.use(cors({
 app.use(express.json());
 
 let users = [
-    { id: 1, firstname: 'Admin', email: 'admin@example.com', password: '$2a$10$...', role: 'admin'},
-    { id: 2, firstname: 'Alice', email: 'alice@example.com', password: '$2a$10$...', role: 'user'}
+    { id: 1, firstName: 'Admin', lastName: 'User', email: 'admin@example.com', password: '$2a$10$...', role: 'admin'},
+    { id: 2, firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', password: '$2a$10$...', role: 'user'}
 ];
 
 if (!users[0].password.includes('$2a$')) {
@@ -63,7 +63,7 @@ app.post('/api/login', async (req, res) => {
         { expiresIn: '1h'}
     );
 
-    res.json({ token, user: { firstName: user.firstName, email: user.email, role: user.role } });
+    res.json({ token, user: { firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role } });
 });
 
 // Profile Route
