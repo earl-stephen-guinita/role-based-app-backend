@@ -709,23 +709,27 @@ departments = window.db.departments;
 employees   = window.db.employees;
 myRequests  = window.db.myRequests;
 
-const savedToken = sessionStorage.getItem("auth_token");
-if (savedToken) {
-    try {
-        const res = await fetch('http://localhost:3000/api/profile', {
-            headers: getAuthHeader()
-        });
-        if (res.ok) {
-            const data = await res.json();
-            setAuthState(true, data.user);
-        } else {
+async function initAuth() {
+    const savedToken = sessionStorage.getItem("authToken");
+    if (savedToken) {
+        try {
+            const res = await fetch('http://localhost:3000/api/profile', {
+                headers: getAuthHeader()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAuthState(true, data.user);
+            } else {
+                sessionStorage.removeItem('authToken');
+                setAuthState(false);
+            }
+        } catch (err) {
             sessionStorage.removeItem('authToken');
             setAuthState(false);
         }
-    } catch (err) {
-        sessionStorage.removeItem('authToken');
+    } else {
         setAuthState(false);
     }
-} else {
-    setAuthState(false);
 }
+
+initAuth();

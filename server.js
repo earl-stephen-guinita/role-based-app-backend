@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = 3000;
 const SECRET_KEY = 'super-secret-key';
-x``
+
 app.use(cors({
     origin: ['http://127.0.0.1:5500', 'http://localhost:5500']
 }));
@@ -14,8 +14,8 @@ app.use(cors({
 app.use(express.json());
 
 let users = [
-    { id: 1, email: 'admin@example.com', password: '$2a$10$...', role: 'admin'},
-    { id: 2, email: 'alice@example.com', password: '$2a$10$...', role: 'user'}
+    { id: 1, firstname: 'Admin', email: 'admin@example.com', password: '$2a$10$...', role: 'admin'},
+    { id: 2, firstname: 'Alice', email: 'alice@example.com', password: '$2a$10$...', role: 'user'}
 ];
 
 if (!users[0].password.includes('$2a$')) {
@@ -35,7 +35,7 @@ app.post('/api/register', async (req, res) => {
    if (existing) {
     return res.status(409).json({ error: 'User already exists'});
    }
-x``
+
    const hashedPassword = await bcrypt.hash(password, 10);
    const newUser = {
     id: users.length + 1,
@@ -63,7 +63,7 @@ app.post('/api/login', async (req, res) => {
         { expiresIn: '1h'}
     );
 
-    res.json({ token, user: { email: user.email, role: user.role } });
+    res.json({ token, user: { firstName: user.firstName, email: user.email, role: user.role } });
 });
 
 // Profile Route
