@@ -1,0 +1,29 @@
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+#page-register,
+#page-login,
+#page-verify,
+#page-profile {
+    max-width: 480px;
+}
+
+body.not-authenticated .role-logged-in { 
+    display: none !important; 
+}
+
+body.authenticated .role-logged-out { 
+    display: none !important; 
+}
+
+.role-admin { 
+    display: none; 
+}
+body.is-admin .role-admin { 
+    display: block; 
+}
