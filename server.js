@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const PORT = 3000;
 const SECRET_KEY = 'super-secret-key';
-
+x``
 app.use(cors({
     origin: ['http://127.0.0.1:5500', 'http://localhost:5500']
 }));
@@ -14,8 +14,8 @@ app.use(cors({
 app.use(express.json());
 
 let users = [
-    { id: 1, username: 'admin', password: '$2a$10$...', role: 'admin'},
-    { id: 2, username: 'alice', password: '$2a$10$...', role: 'user'}
+    { id: 1, email: 'admin@example.com', password: '$2a$10$...', role: 'admin'},
+    { id: 2, email: 'alice@example.com', password: '$2a$10$...', role: 'user'}
 ];
 
 if (!users[0].password.includes('$2a$')) {
@@ -23,47 +23,50 @@ if (!users[0].password.includes('$2a$')) {
     users[1].password = bcrypt.hashSync('user123', 10);
 }
 
+// POST Register Route
 app.post('/api/register', async (req, res) => {
-   const {username, password, role = 'user'} = req.body;
+   const {email, password, role = 'user'} = req.body;
    
-   if (!username || !password) {
-    return res.status(400).json({error: 'Username and password required'});
+   if (!email|| !password) {
+    return res.status(400).json({error: 'Email and password required'});
    }
 
-   const existing = users.find(u => u.username === username);
+   const existing = users.find(u => u.email === email);
    if (existing) {
     return res.status(409).json({ error: 'User already exists'});
    }
-
+x``
    const hashedPassword = await bcrypt.hash(password, 10);
    const newUser = {
     id: users.length + 1,
-    username,
+    email,
     password: hashedPassword,
     role
    };
 
    users.push(newUser);
-   res.status(201).json ({ message: 'User registered', username, role});
+   res.status(201).json ({ message: 'User registered', email, role});
 });
 
+// POST Login Route
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    const user = users.find(u => u.username === username);
+    const user = users.find(u => u.email === email);
     if (!user || !await bcrypt.compare(password, user.password)) {
         return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = jwt.sign(
-        { id: user.id, username: user.username, role: user.role },
+        { id: user.id, email: user.email, role: user.role },
         SECRET_KEY,
         { expiresIn: '1h'}
     );
 
-    res.json({ token, user: { username: user.username, role: user.role } });
+    res.json({ token, user: { email: user.email, role: user.role } });
 });
 
+// Profile Route
 app.get('/api/profile', authenticateToken, (req, res) => {
     res.json({ user: req.user });
 });
@@ -100,9 +103,11 @@ function authorizeRole(role) {
     };
 }
 
+// Start Server
 app.listen(PORT, () => {
     console.log(`✅ Backend running on http://localhost:${PORT}`);
     console.log(`🔐 Try logging in with:`);
-    console.log(`   - Admin: username=admin, password=admin123`);
-    console.log(`   - User:  username=alice, password=user123`);
+    console.log(`   - Admin: email=admin@example.com, password=admin123`);
+    console.log(`   - User:  email=alice@example.com, password=user123`);
 });
+
