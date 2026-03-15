@@ -711,11 +711,19 @@ myRequests  = window.db.myRequests;
 
 const savedToken = sessionStorage.getItem("auth_token");
 if (savedToken) {
-    const user = window.db.accounts.find(a => a.email === savedToken);
-    if (user) {
-        setAuthState(true, user);
-    } else {
-        localStorage.removeItem("auth_token");
+    try {
+        const res = await fetch('http://localhost:3000/api/profile', {
+            headers: getAuthHeader()
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setAuthState(true, data.user);
+        } else {
+            sessionStorage.removeItem('authToken');
+            setAuthState(false);
+        }
+    } catch (err) {
+        sessionStorage.removeItem('authToken');
         setAuthState(false);
     }
 } else {
