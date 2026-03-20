@@ -233,6 +233,42 @@ app.delete('/api/employees/:empId', authenticateToken, authorizeRole('admin'), (
     res.json({ message: 'Employee deleted' });
 });
 
+// ── Requests Data ───────────────────────────────────────
+let requests = [];
+
+// GET Requests for logged-in user
+app.get('/api/requests', authenticateToken, (req, res) => {
+    const userRequests = requests.filter(r => r.employeeEmail === req.user.email);
+    res.json({ requests: userRequests });
+});
+
+// POST Add Request
+app.post('/api/requests', authenticateToken, (req, res) => {
+    const { type, items } = req.body;
+    if (!type || !items || items.length === 0) {
+        return res.status(400).json({ error: 'Type and items are required.' });
+    }
+    const newRequest = {
+        id: requests.length + 1,
+        type,
+        items,
+        status: 'Pending',
+        date: new Date().toLocaleDateString(),
+        employeeEmail: req.user.email
+    };
+    requests.push(newRequest);
+    res.status(201).json({ message: 'Request submitted', request: newRequest });
+});
+
+// DELETE Request
+app.delete('/api/requests/:id', authenticateToken, (req, res) => {
+    const id = parseInt(req.params.id);
+    const index = requests.findIndex(r => r.id === id && r.employeeEmail === req.user.email);
+    if (index === -1) return res.status(404).json({ error: 'Request not found.' });
+    requests.splice(index, 1);
+    res.json({ message: 'Request deleted' });
+});
+
 app.get('/api/admin/dashboard', authenticateToken, authorizeRole('admin'), (req, res) => {
     res.json({ message: 'Welcome to admin dashboard!', data: 'Secret admin info' });
 });

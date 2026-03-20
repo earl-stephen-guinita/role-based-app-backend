@@ -1,40 +1,6 @@
 let isLoggedIn = false;
 let currentUser = null;
 
-// ── Database (localStorage-backed) ────────────────────────
-const STORAGE_KEY = 'ipt_demo_v1';
-
-window.db = {
-    accounts: [],
-    departments: [],
-    employees: [],
-    myRequests: []
-};
-
-function loadFromStorage() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            window.db.employees = parsed.employees || [];
-            window.db.myRequests = parsed.myRequests || [];
-        } else {
-            window.db.employees = [];
-            window.db.myRequests = [];
-            saveToStorage();
-        }
-    } catch (e) {
-
-        window.db.employees = [];
-        window.db.myRequests = [];
-        saveToStorage();
-    }
-}
-
-function saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(window.db));
-}
-
 // ── Hash Routing ───────────────────────────────────────────
 function navigateTo(hash) {
     window.location.hash = hash;
@@ -194,12 +160,6 @@ document.getElementById("registerForm").addEventListener("submit", async functio
 
 // ── Simulate Email Verification ────────────────────────────
 document.getElementById("simulateVerifyBtn").addEventListener("click", function () {
-    const email = localStorage.getItem("unverified_email");
-    const account = window.db.accounts.find(a => a.email === email);
-    if (account) {
-    account.verified = true;
-    saveToStorage();
-    }
     this.disabled = true;
     this.textContent = "✔ Verified!";
     setTimeout(() => {
@@ -263,6 +223,7 @@ function renderProfile() {
 }
 
 // ── Departments Data ───────────────────────────────────────
+let departments = [];
 let editDeptId = null;
 
 async function renderDepts() {
@@ -673,62 +634,61 @@ async function deleteAcc(email) {
 }
 
 // ── My Requests ────────────────────────────────────────────
-let myRequests = [];
-
 function getBadgeClass(status) {
     if (status === 'Approved') return 'bg-success';
     if (status === 'Rejected') return 'bg-danger';
-    return 'bg-warning text-dark';  // Pending
+    return 'bg-warning text-dark';
 }
 
-function saveRequests() {
-    window.db.myRequests = myRequests;
-    saveToStorage();
-}
-
-function renderRequests() {
+async function renderRequests() {
     const noMsg = document.getElementById("noRequestsMsg");
     const table = document.getElementById("requestsTable");
     const tbody = document.getElementById("requestsTableBody");
     tbody.innerHTML = "";
 
-    const userRequests = myRequests.filter(req => req.employeeEmail === currentUser.email);
+    try {
+        const res = await fetch('http://localhost:3000/api/requests', {
+            headers: getAuthHeader()
+        });
+        const data = await res.json();
+        const userRequests = data.requests;
 
-    if (userRequests.length === 0) { 
-        noMsg.classList.remove("d-none");
-        table.classList.add("d-none");
-        return;
+        if (userRequests.length === 0) {
+            noMsg.classList.remove("d-none");
+            table.classList.add("d-none");
+            return;
+        }
+
+        noMsg.classList.add("d-none");
+        table.classList.remove("d-none");
+
+        userRequests.forEach((req) => {
+            const itemsSummary = req.items.map(i => `${i.name} (x${i.qty})`).join(", ");
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${req.type}</td>
+                <td>${itemsSummary}</td>
+                <td>${req.date || '—'}</td>
+                <td><span class="badge ${getBadgeClass(req.status)}">${req.status}</span></td>
+                <td>
+                    <button class="btn btn-outline-danger btn-sm"
+                            onclick="deleteRequest(${req.id})">Delete</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load requests:', err);
     }
-
-    noMsg.classList.add("d-none");
-    table.classList.remove("d-none");
-
-    userRequests.forEach((req) => {
-        const realIndex   = myRequests.indexOf(req);
-        const itemsSummary = req.items.map(i => `${i.name} (x${i.qty})`).join(", ");
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td>${req.type}</td>
-            <td>${itemsSummary}</td>
-            <td>${req.date || '—'}</td>
-            <td><span class="badge ${getBadgeClass(req.status)}">${req.status}</span></td>
-            <td>
-                <button class="btn btn-outline-danger btn-sm"
-                        onclick="deleteRequest(${realIndex})">Delete</button>
-            </td>`;
-        tbody.appendChild(tr);
-    });
 }
 
 function openRequestModal() {
-    // Reset form
     document.getElementById("requestType").value = "Equipment";
     document.getElementById("requestItemsList").innerHTML = "";
-    addRequestItem(); // start with one empty item row
-
+    addRequestItem();
     const modal = new bootstrap.Modal(document.getElementById("requestModal"));
     modal.show();
 }
+
 
 function addRequestItem() {
     const list = document.getElementById("requestItemsList");
@@ -753,7 +713,7 @@ function addRequestItem() {
     list.appendChild(row);
 }
 
-function submitRequest() {
+async function submitRequest() {
     const type = document.getElementById("requestType").value;
     const itemRows = document.querySelectorAll("#requestItemsList .item-row");
     const items = [];
@@ -770,34 +730,44 @@ function submitRequest() {
         return;
     }
 
-    myRequests.push({
-        type,
-        items,
-        status        : "Pending",
-        date          : new Date().toLocaleDateString(),
-        employeeEmail : currentUser.email
-    });
-    saveRequests();
-    renderRequests();
-
-    // Close form
-    bootstrap.Modal.getInstance(document.getElementById("requestModal")).hide();
+    try {
+        const res = await fetch('http://localhost:3000/api/requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+            body: JSON.stringify({ type, items })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            renderRequests();
+            bootstrap.Modal.getInstance(document.getElementById("requestModal")).hide();
+        } else {
+            alert(data.error || 'Failed to submit request.');
+        }
+    } catch (err) {
+        alert('Network error.');
+    }
 }
 
-function deleteRequest(index) {
+async function deleteRequest(id) {
     if (confirm("Delete this request?")) {
-        myRequests.splice(index, 1);
-        saveRequests();
-        renderRequests();
+        try {
+            const res = await fetch(`http://localhost:3000/api/requests/${id}`, {
+                method: 'DELETE',
+                headers: getAuthHeader()
+            });
+            const data = await res.json();
+            if (res.ok) {
+                renderRequests();
+            } else {
+                alert(data.error || 'Failed to delete request.');
+            }
+        } catch (err) {
+            alert('Network error.');
+        }
     }
 }
 
 // ── Init ───────────────────────────────────────────────────
-loadFromStorage();
-
-// Sync local arrays from window.db after loading
-myRequests  = window.db.myRequests;
-
 async function initAuth() {
     const savedToken = sessionStorage.getItem("authToken");
     if (savedToken) {
