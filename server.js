@@ -189,6 +189,50 @@ app.delete('/api/departments/:id', authenticateToken, authorizeRole('admin'), (r
     res.json({ message: 'Department deleted' });
 });
     
+// ── Employees Data ───────────────────────────────────────
+let employees = [];
+
+// GET All Employees
+app.get('/api/employees', authenticateToken, authorizeRole('admin'), (req, res) => {
+    res.json({ employees });
+});
+
+// POST Add Employee
+app.post('/api/employees', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const { empId, email, position, dept, hireDate } = req.body;
+    if (!empId || !email || !position || !dept) {
+        return res.status(400).json({ error: 'ID, Email, Position and Department are required.' });
+    }
+    const existing = employees.find(e => e.empId === empId);
+    if (existing) return res.status(409).json({ error: 'Employee ID already exists.' });
+
+    const userExists = users.find(u => u.email === email);
+    if (!userExists) return res.status(404).json({ error: 'No account found with that email.' });
+
+    employees.push({ empId, email, position, dept, hireDate: hireDate || '' });
+    res.status(201).json({ message: 'Employee added' });
+});
+
+// PATCH Edit Employee
+app.patch('/api/employees/:empId', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const { email, position, dept, hireDate } = req.body;
+    const emp = employees.find(e => e.empId === req.params.empId);
+    if (!emp) return res.status(404).json({ error: 'Employee not found.' });
+    if (email) emp.email = email;
+    if (position) emp.position = position;
+    if (dept) emp.dept = dept;
+    if (hireDate !== undefined) emp.hireDate = hireDate;
+    res.json({ message: 'Employee updated' });
+});
+
+// DELETE Employee
+app.delete('/api/employees/:empId', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const index = employees.findIndex(e => e.empId === req.params.empId);
+    if (index === -1) return res.status(404).json({ error: 'Employee not found.' });
+    employees.splice(index, 1);
+    res.json({ message: 'Employee deleted' });
+});
+
 app.get('/api/admin/dashboard', authenticateToken, authorizeRole('admin'), (req, res) => {
     res.json({ message: 'Welcome to admin dashboard!', data: 'Secret admin info' });
 });

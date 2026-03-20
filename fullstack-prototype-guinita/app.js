@@ -371,118 +371,124 @@ async function deleteDept(id) {
 
 // ── Employees Data ─────────────────────────────────────────
 let employees = [];
-let editEmpIndex = null; // tracks edited employees, while null adds new employee
+let editEmpId = null;
 
-function saveEmps() {
-    window.db.employees = employees;
-    saveToStorage();
-}
-
-function refreshDeptDropdown() { // whenever a new dept is added, it appears in the dropdown
-    const select = document.getElementById("empDept");
-    if (!select) return;
-    const current = select.value;
-    select.innerHTML = '<option value="">Select Department</option>';
-    departments.forEach(dept => {
-        const opt = document.createElement("option");
-        opt.value = dept.name;
-        opt.textContent = dept.name;
-        if (dept.name === current) opt.selected = true;
-        select.appendChild(opt);
-    });
-}
-
-function renderEmployeesTable() {
+async function renderEmployeesTable() {
     const tbody = document.getElementById("employeeTableBody");
     const noRow = document.getElementById("noEmployeesRow");
-    tbody.querySelectorAll("tr.emp-row").forEach(r => r.remove()); // if employee exists, loop each one and create row
+    tbody.querySelectorAll("tr.emp-row").forEach(r => r.remove());
 
-    if (employees.length === 0) {
-        noRow.classList.remove("d-none");
-        return;
+    try {
+        const res = await fetch('http://localhost:3000/api/employees', {
+            headers: getAuthHeader()
+        });
+        const data = await res.json();
+        employees = data.employees;
+
+        if (employees.length === 0) {
+            noRow.classList.remove("d-none");
+            return;
+        }
+        noRow.classList.add("d-none");
+
+        employees.forEach((emp) => {
+            const tr = document.createElement("tr");
+            tr.classList.add("emp-row");
+            tr.innerHTML = `
+                <td>${emp.empId}</td>
+                <td>${emp.email}</td>
+                <td>${emp.position}</td>
+                <td>${emp.dept}</td>
+                <td>
+                    <button class="btn btn-outline-primary btn-sm me-1" onclick="editEmp('${emp.empId}')">Edit</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="deleteEmp('${emp.empId}')">Delete</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load employees:', err);
     }
-    noRow.classList.add("d-none");
-
-    employees.forEach((emp, index) => {
-        const tr = document.createElement("tr");
-        tr.classList.add("emp-row");
-        tr.innerHTML = `
-            <td>${emp.id}</td>
-            <td>${emp.email}</td>
-            <td>${emp.position}</td>
-            <td>${emp.dept}</td>
-            <td>
-                <button class="btn btn-outline-primary btn-sm me-1" onclick="editEmp(${index})">Edit</button>
-                <button class="btn btn-outline-danger btn-sm" onclick="deleteEmp(${index})">Delete</button>
-            </td>`;
-        tbody.appendChild(tr);
-    });
 }
 
-function toggleEmployeeForm(show, index = null) { // if null clears form, if not null pre-fill form with existing data
+function toggleEmployeeForm(show, empId = null) {
     document.getElementById("employeeForm").classList.toggle("d-none", !show);
     if (show) {
-        editEmpIndex = index;
+        editEmpId = empId;
         refreshDeptDropdown();
-        document.getElementById("employeeFormTitle").textContent =
-            index !== null ? "Edit Employee" : "Add/Edit Employee";
-        document.getElementById("empId").value = index !== null ? employees[index].id : "";
-        document.getElementById("empEmail").value = index !== null ? employees[index].email : "";
-        document.getElementById("empPosition").value = index !== null ? employees[index].position : "";
-        document.getElementById("empDept").value = index !== null ? employees[index].dept : "";
-        document.getElementById("empHireDate").value = index !== null ? employees[index].hireDate : "";
+        const emp = empId !== null ? employees.find(e => e.empId === empId) : null;
+        document.getElementById("employeeFormTitle").textContent = empId !== null ? "Edit Employee" : "Add Employee";
+        document.getElementById("empId").value = emp ? emp.empId : "";
+        document.getElementById("empEmail").value = emp ? emp.email : "";
+        document.getElementById("empPosition").value = emp ? emp.position : "";
+        document.getElementById("empDept").value = emp ? emp.dept : "";
+        document.getElementById("empHireDate").value = emp ? emp.hireDate : "";
     }
 }
 
-function saveEmployee() {
-    const id = document.getElementById("empId").value.trim();
+async function saveEmployee() {
+    const empId = document.getElementById("empId").value.trim();
     const email = document.getElementById("empEmail").value.trim();
     const position = document.getElementById("empPosition").value.trim();
     const dept = document.getElementById("empDept").value;
     const hireDate = document.getElementById("empHireDate").value;
 
-    if (!id || !email || !position || !dept) {
+    if (!empId || !email || !position || !dept) {
         alert("ID, Email, Position and Department are required.");
         return;
     }
 
-    // Email must match an existing account
-    const accountExists = window.db.accounts.find(a => a.email === email);
-    if (!accountExists) {
-        alert("No account found with that email. Please use an existing account email.");
-        return;
-    }
-    
-    if (editEmpIndex !== null) {
-        employees[editEmpIndex] = { id, email, position, dept, hireDate };
-    } else {
-        employees.push({ id, email, position, dept, hireDate });
-    }
+    try {
+        let res;
+        if (editEmpId !== null) {
+            res = await fetch(`http://localhost:3000/api/employees/${editEmpId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                body: JSON.stringify({ email, position, dept, hireDate })
+            });
+        } else {
+            res = await fetch('http://localhost:3000/api/employees', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                body: JSON.stringify({ empId, email, position, dept, hireDate })
+            });
+        }
 
-    saveEmps();
-    renderEmployeesTable();
-    toggleEmployeeForm(false);
+        const data = await res.json();
+        if (res.ok) {
+            renderEmployeesTable();
+            toggleEmployeeForm(false);
+        } else {
+            alert(data.error || 'Failed to save employee.');
+        }
+    } catch (err) {
+        alert('Network error.');
+    }
 }
 
-function editEmp(index) {
-    toggleEmployeeForm(true, index);
+function editEmp(empId) {
+    toggleEmployeeForm(true, empId);
 }
 
-function deleteEmp(index) { // deletes an employee
+async function deleteEmp(empId) {
     if (confirm("Delete this employee?")) {
-        employees.splice(index, 1);
-        saveEmps();
-        renderEmployeesTable();
+        try {
+            const res = await fetch(`http://localhost:3000/api/employees/${empId}`, {
+                method: 'DELETE',
+                headers: getAuthHeader()
+            });
+            const data = await res.json();
+            if (res.ok) {
+                renderEmployeesTable();
+            } else {
+                alert(data.error || 'Failed to delete employee.');
+            }
+        } catch (err) {
+            alert('Network error.');
+        }
     }
 }
 
 // ── Accounts Data ──────────────────────────────────────────
-let editAccIndex = null;
-
-function saveAccounts() {
-    saveToStorage();
-}
-
 async function renderAccountsList() {
     const tbody = document.getElementById("accountTableBody");
     const noRow = document.getElementById("noAccountsRow");
@@ -790,7 +796,6 @@ function deleteRequest(index) {
 loadFromStorage();
 
 // Sync local arrays from window.db after loading
-employees   = window.db.employees;
 myRequests  = window.db.myRequests;
 
 async function initAuth() {
