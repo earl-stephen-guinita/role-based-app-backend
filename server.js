@@ -14,8 +14,8 @@ app.use(cors({
 app.use(express.json());
 
 let users = [
-    { id: 1, firstName: 'Admin', lastName: 'User', email: 'admin@example.com', password: 'UNHASHED', role: 'admin'},
-    { id: 2, firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', password: 'UNHASHED', role: 'user'}
+    { id: 1, firstName: 'Admin', lastName: 'User', email: 'admin@example.com', password: 'UNHASHED', role: 'admin', verified: true},
+    { id: 2, firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', password: 'UNHASHED', role: 'user', verified: true}
 ];
 
 if (!users[0].password.includes('$2a$')) {
@@ -43,7 +43,8 @@ app.post('/api/register', async (req, res) => {
     lastName,
     email,
     password: hashedPassword,
-    role
+    role,
+    verified: false
    };
 
    users.push(newUser);
@@ -71,6 +72,29 @@ app.post('/api/login', async (req, res) => {
 // Profile Route
 app.get('/api/profile', authenticateToken, (req, res) => {
     res.json({ user: req.user });
+});
+
+app.get('/api/users', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const safeUsers = users.map(({ password, ...rest }) => rest);
+    res.json({ users: safeUsers });
+});
+
+// DELETE User Route
+app.delete('/api/users/:email', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const email = req.params.email;
+    const protectedEmails = ['admin@example.com', 'alice@example.com'];
+
+    if (protectedEmails.includes(email)) {
+        return res.status(403).json({ error: 'Cannot delete default system accounts.' });
+    }
+
+    const index = users.findIndex(u => u.email === email);
+    if (index === -1) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    users.splice(index, 1);
+    res.json({ message: 'User deleted' });
 });
     
 app.get('/api/admin/dashboard', authenticateToken, authorizeRole('admin'), (req, res) => {

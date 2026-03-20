@@ -486,32 +486,42 @@ function saveAccounts() {
     saveToStorage();
 }
 
-function renderAccountsList() {
+async function renderAccountsList() {
     const tbody = document.getElementById("accountTableBody");
     const noRow = document.getElementById("noAccountsRow");
     tbody.querySelectorAll("tr.acc-row").forEach(r => r.remove());
 
-    if (window.db.accounts.length === 0) {
-        noRow.classList.remove("d-none");
-        return;
-    }
-    noRow.classList.add("d-none");
+    try {
+        const res = await fetch('http://localhost:3000/api/users', {
+            headers: getAuthHeader()
+        });
+        const data = await res.json();
+        const accounts = data.users;
 
-    window.db.accounts.forEach((acc, index) => {
-        const tr = document.createElement("tr");
-        tr.classList.add("acc-row");
-        tr.innerHTML = `
-            <td>${acc.firstName} ${acc.lastName}</td>
-            <td>${acc.email}</td>
-            <td>${acc.role.charAt(0).toUpperCase() + acc.role.slice(1)}</td>
-            <td>${acc.verified ? '✅' : '❌'}</td>
-            <td>
-                <button class="btn btn-outline-primary btn-sm me-1" onclick="editAcc(${index})">Edit</button>
-                <button class="btn btn-outline-warning btn-sm me-1" onclick="resetPassword(${index})">Reset Password</button>
-                <button class="btn btn-outline-danger btn-sm" onclick="deleteAcc(${index})">Delete</button>
-            </td>`;
-        tbody.appendChild(tr);
-    });
+        if (accounts.length === 0) {
+            noRow.classList.remove("d-none");
+            return;
+        }
+        noRow.classList.add("d-none");
+
+        accounts.forEach((acc) => {
+            const tr = document.createElement("tr");
+            tr.classList.add("acc-row");
+            tr.innerHTML = `
+                <td>${acc.firstName} ${acc.lastName}</td>
+                <td>${acc.email}</td>
+                <td>${acc.role.charAt(0).toUpperCase() + acc.role.slice(1)}</td>
+                <td>${acc.verified ? '✅' : '❌'}</td>
+                <td>
+                    <button class="btn btn-outline-primary btn-sm me-1" onclick="editAcc('${acc.email}')">Edit</button>
+                    <button class="btn btn-outline-warning btn-sm me-1" onclick="resetPassword('${acc.email}')">Reset Password</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="deleteAcc('${acc.email}')">Delete</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load accounts:', err);
+    }
 }
 
 function toggleAccountForm(show, index = null) {
@@ -570,7 +580,12 @@ function resetPassword(index) {
     }
 }
 
-function deleteAcc(index) {
+async function deleteAcc(email) {
+    if (email === currentUser.email) {
+        alert("You cannot delete your own account while logged in.");
+        return;
+    }    
+
     if (confirm("Delete this account?")) {
 
         // Fix: checks if deleting the currently logged-in account (prevents deleting own acc)
