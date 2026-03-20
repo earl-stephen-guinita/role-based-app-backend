@@ -16,46 +16,15 @@ function loadFromStorage() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
-            window.db.accounts = parsed.accounts || [];
-            window.db.departments = parsed.departments || [];
             window.db.employees = parsed.employees || [];
             window.db.myRequests = parsed.myRequests || [];
         } else {
-            // No data yet — seed with defaults
-            window.db.accounts = [
-                {
-                    firstName: 'Admin',
-                    lastName: 'User',
-                    email: 'admin@example.com',
-                    password: 'Password123!',
-                    role: 'admin',
-                    verified: true
-                }
-            ];
-            window.db.departments = [
-                { name: 'Engineering', description: 'Software team' },
-                { name: 'HR', description: 'Human Resources' }
-            ];
             window.db.employees = [];
             window.db.myRequests = [];
             saveToStorage();
         }
     } catch (e) {
-        // Corrupt data — reset to defaults
-        window.db.accounts = [
-            {
-                firstName: 'Admin',
-                lastName: 'User',
-                email: 'admin@example.com',
-                password: 'Password123!',
-                role: 'admin',
-                verified: true
-            }
-        ];
-        window.db.departments = [
-            { name: 'Engineering', description: 'Engineering department' },
-            { name: 'HR', description: 'Human Resources department' }
-        ];
+
         window.db.employees = [];
         window.db.myRequests = [];
         saveToStorage();
