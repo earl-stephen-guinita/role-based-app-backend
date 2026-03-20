@@ -294,81 +294,109 @@ function renderProfile() {
 }
 
 // ── Departments Data ───────────────────────────────────────
-let departments = [];
-let editDeptIndex = null; // tracks edited departments, while null adds new department
+let editDeptId = null;
 
-function saveDepts() {
-    window.db.departments = departments;
-    saveToStorage();
-}
-
-function renderDepts() {
+async function renderDepts() {
     const tbody = document.getElementById("deptTableBody");
     const noRow = document.getElementById("noDeptsRow");
-    // Clear existing rows except the "no depts" row
-    tbody.querySelectorAll("tr.dept-row").forEach(r => r.remove()); // if dept exists, loop each one and create row
+    tbody.querySelectorAll("tr.dept-row").forEach(r => r.remove());
 
-    if (departments.length === 0) {
-        noRow.classList.remove("d-none");
-        return;
+    try {
+        const res = await fetch('http://localhost:3000/api/departments', {
+            headers: getAuthHeader()
+        });
+        const data = await res.json();
+        departments = data.departments;
+
+        if (departments.length === 0) {
+            noRow.classList.remove("d-none");
+            return;
+        }
+        noRow.classList.add("d-none");
+
+        departments.forEach((dept) => {
+            const tr = document.createElement("tr");
+            tr.classList.add("dept-row");
+            tr.innerHTML = `
+                <td>${dept.name}</td>
+                <td>${dept.description}</td>
+                <td>
+                    <button class="btn btn-outline-primary btn-sm me-1" onclick="editDept(${dept.id})">Edit</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="deleteDept(${dept.id})">Delete</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+
+        refreshDeptDropdown();
+    } catch (err) {
+        console.error('Failed to load departments:', err);
     }
-    noRow.classList.add("d-none");
-
-    departments.forEach((dept, index) => {
-        const tr = document.createElement("tr");
-        tr.classList.add("dept-row");
-        tr.innerHTML = `
-            <td>${dept.name}</td>
-            <td>${dept.description}</td>
-            <td>
-                <button class="btn btn-outline-primary btn-sm me-1" onclick="editDept(${index})">Edit</button>
-                <button class="btn btn-outline-danger btn-sm" onclick="deleteDept(${index})">Delete</button>
-            </td>`;
-        tbody.appendChild(tr);
-    });
-
-    // Also refresh the dept dropdown in the employee form
-    refreshDeptDropdown();
 }
 
-function toggleDeptForm(show, index = null) { // if null clears form, if not null pre-fill form with existing data
+function toggleDeptForm(show, id = null) {
     document.getElementById("deptForm").classList.toggle("d-none", !show);
     if (show) {
-        editDeptIndex = index;
-        document.getElementById("deptFormTitle").textContent =
-            index !== null ? "Edit Department" : "Add Department";
-        document.getElementById("deptName").value =
-            index !== null ? departments[index].name : "";
-        document.getElementById("deptDescription").value =
-            index !== null ? departments[index].description : "";
+        editDeptId = id;
+        const dept = id !== null ? departments.find(d => d.id === id) : null;
+        document.getElementById("deptFormTitle").textContent = id !== null ? "Edit Department" : "Add Department";
+        document.getElementById("deptName").value = dept ? dept.name : "";
+        document.getElementById("deptDescription").value = dept ? dept.description : "";
     }
 }
 
-function saveDepartment() {
+async function saveDepartment() {
     const name = document.getElementById("deptName").value.trim();
     const description = document.getElementById("deptDescription").value.trim();
     if (!name) { alert("Department name is required."); return; }
 
-    if (editDeptIndex !== null) {
-        departments[editDeptIndex] = { name, description };
-    } else {
-        departments.push({ name, description });
+    try {
+        let res;
+        if (editDeptId !== null) {
+            res = await fetch(`http://localhost:3000/api/departments/${editDeptId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                body: JSON.stringify({ name, description })
+            });
+        } else {
+            res = await fetch('http://localhost:3000/api/departments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                body: JSON.stringify({ name, description })
+            });
+        }
+
+        const data = await res.json();
+        if (res.ok) {
+            renderDepts();
+            toggleDeptForm(false);
+        } else {
+            alert(data.error || 'Failed to save department.');
+        }
+    } catch (err) {
+        alert('Network error.');
     }
-
-    saveDepts();
-    renderDepts();
-    toggleDeptForm(false);
 }
 
-function editDept(index) {
-    toggleDeptForm(true, index);
+function editDept(id) {
+    toggleDeptForm(true, id);
 }
 
-function deleteDept(index) { // deletes a department
+async function deleteDept(id) {
     if (confirm("Delete this department?")) {
-        departments.splice(index, 1);
-        saveDepts();
-        renderDepts();
+        try {
+            const res = await fetch(`http://localhost:3000/api/departments/${id}`, {
+                method: 'DELETE',
+                headers: getAuthHeader()
+            });
+            const data = await res.json();
+            if (res.ok) {
+                renderDepts();
+            } else {
+                alert(data.error || 'Failed to delete department.');
+            }
+        } catch (err) {
+            alert('Network error.');
+        }
     }
 }
 
@@ -385,7 +413,7 @@ function refreshDeptDropdown() { // whenever a new dept is added, it appears in 
     const select = document.getElementById("empDept");
     if (!select) return;
     const current = select.value;
-    select.innerHTML = '<option value="">--Select Department--</option>';
+    select.innerHTML = '<option value="">Select Department</option>';
     departments.forEach(dept => {
         const opt = document.createElement("option");
         opt.value = dept.name;
@@ -524,22 +552,47 @@ async function renderAccountsList() {
     }
 }
 
-function toggleAccountForm(show, index = null) {
-    document.getElementById("accountForm").classList.toggle("d-none", !show);
-    if (show) {
-        editAccIndex = index;
-        document.getElementById("accountFormTitle").textContent =
-            index !== null ? "Edit Account" : "Add/Edit Account";
-        document.getElementById("accFirstName").value = index !== null ? window.db.accounts[index].firstName : "";
-        document.getElementById("accLastName").value = index !== null ? window.db.accounts[index].lastName : "";
-        document.getElementById("accEmail").value = index !== null ? window.db.accounts[index].email : "";
-        document.getElementById("accPassword").value = index !== null ? window.db.accounts[index].password : "";
-        document.getElementById("accRole").value = index !== null ? window.db.accounts[index].role : "user";
-        document.getElementById("accVerified").checked = index !== null ? window.db.accounts[index].verified : false;
+async function toggleAccountForm(email = null) {
+    const form = document.getElementById("accountForm");
+    if (!email) {
+        form.classList.remove("d-none");
+        document.getElementById("accountFormTitle").textContent = "Add Account";
+        document.getElementById("accFirstName").value = "";
+        document.getElementById("accLastName").value = "";
+        document.getElementById("accEmail").value = "";
+        document.getElementById("accPassword").value = "";
+        document.getElementById("accRole").value = "user";
+        document.getElementById("accVerified").checked = false;
+        return;
+    }
+
+    // Fetch user from backend to pre-fill
+    try {
+        const res = await fetch('http://localhost:3000/api/users', {
+            headers: getAuthHeader()
+        });
+        const data = await res.json();
+        const acc = data.users.find(u => u.email === email);
+        if (acc) {
+            form.classList.remove("d-none");
+            document.getElementById("accountFormTitle").textContent = "Edit Account";
+            document.getElementById("accFirstName").value = acc.firstName;
+            document.getElementById("accLastName").value = acc.lastName;
+            document.getElementById("accEmail").value = acc.email;
+            document.getElementById("accPassword").value = "";
+            document.getElementById("accRole").value = acc.role;
+            document.getElementById("accVerified").checked = acc.verified;
+        }
+    } catch (err) {
+        alert('Network error.');
     }
 }
 
-function saveAccount() {
+function closeAccountForm() {
+    document.getElementById("accountForm").classList.add("d-none");
+}
+
+async function saveAccount() {
     const firstName = document.getElementById("accFirstName").value.trim();
     const lastName = document.getElementById("accLastName").value.trim();
     const email = document.getElementById("accEmail").value.trim();
@@ -547,36 +600,72 @@ function saveAccount() {
     const role = document.getElementById("accRole").value;
     const verified = document.getElementById("accVerified").checked;
 
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !email) {
         alert("All fields are required.");
         return;
     }
 
-    if (editAccIndex !== null) {
-        window.db.accounts[editAccIndex] = { firstName, lastName, email, password, role, verified };
-    } else {
-        window.db.accounts.push({ firstName, lastName, email, password, role, verified });
+    const isEditing = document.getElementById("accountFormTitle").textContent === "Edit Account";
+
+    try {
+        let res;
+        if (isEditing) {
+            // PATCH - edit existing user
+            res = await fetch(`http://localhost:3000/api/users/${email}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                body: JSON.stringify({ firstName, lastName, role, verified })
+            });
+        } else {
+            // POST - create new user
+            if (!password) { alert("Password is required."); return; }
+            res = await fetch('http://localhost:3000/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                body: JSON.stringify({ firstName, lastName, email, password, role, verified })
+            });
+        }
+
+        const data = await res.json();
+
+        if (res.ok) {
+            renderAccountsList();
+            toggleAccountForm(null);
+            document.getElementById("accountForm").classList.add("d-none");
+        } else {
+            alert(data.error || 'Failed to save account.');
+        }
+    } catch (err) {
+        alert('Network error.');
     }
-
-    saveAccounts();
-    renderAccountsList();
-    toggleAccountForm(false);
 }
 
-function editAcc(index) {
-    toggleAccountForm(true, index);
+function editAcc(email) {
+    toggleAccountForm(email);
 }
 
-function resetPassword(index) {
-    const newPass = prompt("Enter new password for " + window.db.accounts[index].firstName + ":");
+async function resetPassword(email) {
+    const newPass = prompt("Enter new password for " + email + ":");
     if (newPass && newPass.trim() !== "") {
         if (newPass.trim().length < 6) {
             alert("Password must be at least 6 characters.");
             return;
-        }        
-        window.db.accounts[index].password = newPass.trim();
-        saveAccounts();
-        alert("✅ Password reset successfully.");
+        }
+        try {
+            const res = await fetch(`http://localhost:3000/api/users/${email}/password`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+                body: JSON.stringify({ password: newPass.trim() })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert("✅ Password reset successfully.");
+            } else {
+                alert(data.error || 'Failed to reset password.');
+            }
+        } catch (err) {
+            alert('Network error.');
+        }
     }
 }
 
@@ -589,14 +678,22 @@ async function deleteAcc(email) {
     if (confirm("Delete this account?")) {
 
         // Fix: checks if deleting the currently logged-in account (prevents deleting own acc)
-        if (window.db.accounts[index].email === currentUser.email) {
-            alert("You cannot delete your own account while logged in.");
-            return;
-        }
+        try {
+            const res = await fetch(`http://localhost:3000/api/users/${email}`, {
+                method: 'DELETE',
+                headers: getAuthHeader()
+            });
 
-        window.db.accounts.splice(index, 1);
-        saveAccounts();
-        renderAccountsList();
+            const data = await res.json();
+
+            if (res.ok) {
+                renderAccountsList();
+            } else {
+                alert(data.error || 'Failed to delete account.');
+            }
+        } catch (err) {
+            alert('Network error.');
+        }
     }
 }
 
@@ -724,7 +821,6 @@ function deleteRequest(index) {
 loadFromStorage();
 
 // Sync local arrays from window.db after loading
-departments = window.db.departments;
 employees   = window.db.employees;
 myRequests  = window.db.myRequests;
 

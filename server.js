@@ -79,6 +79,24 @@ app.get('/api/users', authenticateToken, authorizeRole('admin'), (req, res) => {
     res.json({ users: safeUsers });
 });
 
+// POST Admin Add Account Route
+app.post('/api/users', authenticateToken, authorizeRole('admin'), async (req, res) => {
+    const { firstName, lastName, email, password, role = 'user', verified = false } = req.body;
+
+    if (!firstName || !lastName || !email || !password) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const existing = users.find(u => u.email === email);
+    if (existing) {
+        return res.status(409).json({ error: 'User already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    users.push({ id: users.length + 1, firstName, lastName, email, password: hashedPassword, role, verified });
+    res.status(201).json({ message: 'Account created' });
+});
+
 // DELETE User Route
 app.delete('/api/users/:email', authenticateToken, authorizeRole('admin'), (req, res) => {
     const email = req.params.email;
@@ -95,6 +113,80 @@ app.delete('/api/users/:email', authenticateToken, authorizeRole('admin'), (req,
 
     users.splice(index, 1);
     res.json({ message: 'User deleted' });
+});
+
+// PATCH Reset Password Route
+app.patch('/api/users/:email/password', authenticateToken, authorizeRole('admin'), async (req, res) => {
+    const { password } = req.body;
+    const email = req.params.email;
+
+    if (!password || password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    }
+
+    const user = users.find(u => u.email === email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.password = await bcrypt.hash(password, 10);
+    res.json({ message: 'Password reset successfully.' });
+});
+
+// PATCH Edit User Route
+app.patch('/api/users/:email', authenticateToken, authorizeRole('admin'), async (req, res) => {
+    const { firstName, lastName, role, verified } = req.body;
+    const email = req.params.email;
+
+    const user = users.find(u => u.email === email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (role) user.role = role;
+    if (verified !== undefined) user.verified = verified;
+
+    res.json({ message: 'Account updated' });
+});
+
+// ── Departments Data ───────────────────────────────────────
+let departments = [
+    { id: 1, name: 'Engineering', description: 'Software team' },
+    { id: 2, name: 'HR', description: 'Human Resources' }
+];
+
+// GET All Departments
+app.get('/api/departments', authenticateToken, (req, res) => {
+    res.json({ departments });
+});
+
+// POST Add Department
+app.post('/api/departments', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const { name, description } = req.body;
+    if (!name) return res.status(400).json({ error: 'Department name is required.' });
+    const existing = departments.find(d => d.name === name);
+    if (existing) return res.status(409).json({ error: 'Department already exists.' });
+    const newDept = { id: departments.length + 1, name, description: description || '' };
+    departments.push(newDept);
+    res.status(201).json({ message: 'Department created', department: newDept });
+});
+
+// PATCH Edit Department
+app.patch('/api/departments/:id', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const id = parseInt(req.params.id);
+    const { name, description } = req.body;
+    const dept = departments.find(d => d.id === id);
+    if (!dept) return res.status(404).json({ error: 'Department not found.' });
+    if (name) dept.name = name;
+    if (description !== undefined) dept.description = description;
+    res.json({ message: 'Department updated', department: dept });
+});
+
+// DELETE Department
+app.delete('/api/departments/:id', authenticateToken, authorizeRole('admin'), (req, res) => {
+    const id = parseInt(req.params.id);
+    const index = departments.findIndex(d => d.id === id);
+    if (index === -1) return res.status(404).json({ error: 'Department not found.' });
+    departments.splice(index, 1);
+    res.json({ message: 'Department deleted' });
 });
     
 app.get('/api/admin/dashboard', authenticateToken, authorizeRole('admin'), (req, res) => {
